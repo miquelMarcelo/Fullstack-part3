@@ -16,7 +16,7 @@ app.get('/api/persons', (req, res) => {
   Agenda.find({}).then(agenda => res.json(agenda))
 })
 
-app.get('/api/persons/:id', (req, res) => {
+app.get('/api/persons/:id', (req, res, next) => {
   const id = req.params.id
   Agenda.findById(id)
     .then(people => {
@@ -26,9 +26,7 @@ app.get('/api/persons/:id', (req, res) => {
         res.status(404).end()
       }
     })
-    .catch(e => {
-      res.status(400).send({ error: 'malformated id' })
-    })
+    .catch(e => next(e))
 })
 
 app.post('/api/persons/', (req, res) => {
@@ -55,9 +53,9 @@ app.post('/api/persons/', (req, res) => {
 app.delete('/api/persons/:id', (req, res) => {
   const id = req.params.id
   Agenda.findByIdAndDelete(id)
-    .then(result => {
-      if (result) {
-        res.status(200).json(result)
+    .then(person => {
+      if (person) {
+        res.status(200).json(person)
       } else {
         res.status(404).json({ error: 'No existe la Persona a borra' })
       }
@@ -67,11 +65,23 @@ app.delete('/api/persons/:id', (req, res) => {
     })
 })
 
+app.put('/api/persons/:id', (req, res, next) => {
+  const id = req.params.id
+  const update = {
+    name: req.body.name,
+    number: req.body.number
+  }
+  Agenda.findByIdAndUpdate(id, update, { new: true })
+    .then((person) => {
+      res.status(200).json(person)
+    })
+    .catch((e) => next(e))
+})
+
 app.get('/info', (req, res) => {
   const fecha = new Date()
   Agenda.find({})
     .then((agenda) => {
-      console.log(agenda.length)
       const info = `Phonebook has info for ${agenda.length} people \n ${fecha.toString()}`
       res.send(info)
     })
@@ -79,6 +89,24 @@ app.get('/info', (req, res) => {
       res.send(400).end()
     })
 })
+
+const unknownEndpoint = (request, response) => {
+  response.status(404).send({ error: 'unknown endpoint' })
+}
+
+app.use(unknownEndpoint)
+
+const errorHandler = (error, request, response, next) => {
+  console.error(error.message)
+
+  if (error.name === 'CastError') {
+    return response.status(400).send({ error: 'malformatted id' })
+  }
+
+  next(error)
+}
+
+app.use(errorHandler)
 
 const PORT = process.env.PORT || 3002
 app.listen(PORT, () => {
